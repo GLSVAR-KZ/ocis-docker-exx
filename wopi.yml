@@ -1,0 +1,27 @@
+---
+# Optional: expose the WOPI collaboration endpoint for OnlyOffice via a public domain.
+# This is needed if the OnlyOffice Document Server runs outside the Docker network
+# and must reach the WOPI server over the internet.
+# For the default all-in-one Docker setup every service is on the same internal
+# network (ocis-net) so this overlay is NOT required — OnlyOffice calls
+# collaboration-oo directly via the Docker DNS alias.
+#
+# Enable by setting WOPI=:wopi.yml in .env and adding ${WOPI:-} to COMPOSE_FILE.
+
+services:
+  traefik:
+    networks:
+      ocis-net:
+        aliases:
+          - ${WOPI_DOMAIN:-wopi.owncloud.test}
+
+  collaboration-oo:
+    labels:
+      # Keep the existing internal HTTP route unchanged and ADD a public HTTPS route.
+      - "traefik.http.routers.wopi.entrypoints=https"
+      - "traefik.http.routers.wopi.rule=Host(`${WOPI_DOMAIN:-wopi.owncloud.test}`)"
+      - "traefik.http.routers.wopi.tls.certresolver=http"
+      - "traefik.http.routers.wopi.service=collaboration-oo"
+    environment:
+      # Override so OnlyOffice uses the public HTTPS WOPI URL when this overlay is active.
+      COLLABORATION_WOPI_SRC: https://${WOPI_DOMAIN:-wopi.owncloud.test}
